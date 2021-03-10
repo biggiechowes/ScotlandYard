@@ -1,7 +1,7 @@
 Scotland Yard
 =============
 
-####COMS10017 Summative Coursework
+##COMS10017 Summative Coursework
 
 
 
@@ -19,6 +19,6 @@ Scotland Yard
 
 
 
-######Autors:
+Autors:
 **Paul Vladislav**	[email: we20949@bristol.ac.uk]
 **Connor Howes**	[email: oi20681@bristol.ac.uk]
