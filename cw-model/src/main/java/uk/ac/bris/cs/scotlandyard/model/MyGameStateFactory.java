@@ -4,6 +4,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.*;
 import javax.annotation.Nonnull;
+
+import org.jetbrains.annotations.NotNull;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.Move.*;
 import uk.ac.bris.cs.scotlandyard.model.Piece.*;
@@ -14,6 +16,12 @@ import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.*;
  * Stage 1: Complete this class
  */
 public final class MyGameStateFactory implements Factory<GameState> {
+	@NotNull
+	@Override
+	public GameState build(GameSetup setup, Player mrX, ImmutableList<Player> detectives) {
+		return null;
+	}
+
 	public final class MyGameState implements GameState {
 
 		@Override public GameSetup getSetup() {
@@ -47,5 +55,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Override public GameState advance (Move move) {
 			return null;
 		}
+
 	}
 }
