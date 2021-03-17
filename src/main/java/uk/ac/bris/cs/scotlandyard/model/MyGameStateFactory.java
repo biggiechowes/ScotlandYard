@@ -46,17 +46,44 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.everyone = ImmutableList.copyOf(detectives);
 
 		}
-
-
 		// Methods
-		@Override public GameSetup getSetup() {  return null; }
-		@Override public ImmutableSet<Piece> getPlayers() { return null; }
 		@Override public GameState advance(Move move) {  return null;  }
-		@Override public Optional<Integer> getDetectiveLocation(Detective detective) { return null; }
-		@Override public Optional<TicketBoard> getPlayerTickets(Piece piece) { return null; }
-		@Override public ImmutableList<LogEntry> getMrXTravelLog() { return null ;}
+
+		// Getters
+		@Nonnull @Override public GameSetup getSetup() {
+			return setup;
+		}
+
+		@Override public ImmutableSet<Piece> getPlayers() {
+			return null;
+		}
+
+		@Nonnull @Override public Optional<Integer> getDetectiveLocation(Detective detective) {
+			for (Player p : detectives) {
+				System.out.println("Player: " + p.piece().webColour());
+				if (p.piece() == detective) {
+					return Optional.of(p.location());
+				}
+			}
+			return Optional.empty();
+		}
+		@Override public Optional<TicketBoard> getPlayerTickets(Piece piece) {
+			/*
+			for (Player p : everyone) {
+				if (p.piece() == piece) {
+					return Optional.of();
+				}
+			}
+			*/
+			return null;
+			//test
+		}
+		@Nonnull @Override public ImmutableList<LogEntry> getMrXTravelLog() {
+			return log;
+		}
 		@Override public ImmutableSet<Piece> getWinner() { return null; }
 		@Override public ImmutableSet<Move> getAvailableMoves() { return null; }
-		//@Override public GameState advance(Move move) { return null ;}
+
+
 	}
 }
