@@ -36,6 +36,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (detectives.isEmpty()) throw new IllegalArgumentException("detectives is empty!");
 
 
+
+
 			// Initialisation
 			this.setup = setup;
 			this.remaining = remaining;
@@ -44,6 +46,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.detectives = detectives;
 			detectives.add(mrX);
 			this.everyone = ImmutableList.copyOf(detectives);
+
+			System.out.println(this.detectives.isEmpty());
 
 		}
 		// Methods
@@ -60,7 +64,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		@Nonnull @Override public Optional<Integer> getDetectiveLocation(Detective detective) {
 			for (Player p : detectives) {
-				System.out.println("Player: " + p.piece().webColour());
+
+				System.out.println(p.piece().webColour());
+
 				if (p.piece() == detective) {
 					return Optional.of(p.location());
 				}
