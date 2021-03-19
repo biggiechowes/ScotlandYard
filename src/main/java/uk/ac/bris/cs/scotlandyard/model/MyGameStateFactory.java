@@ -122,10 +122,57 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull @Override public ImmutableList<LogEntry> getMrXTravelLog() {
 			return log;
 		}
+
 		@Override public ImmutableSet<Piece> getWinner() {
 			return this.winner;
 		}
-		@Override public ImmutableSet<Move> getAvailableMoves() { return null; }
+
+		private ImmutableSet<SingleMove> makeSingleMoves(
+				GameSetup setup,
+				List<Player> detectives,
+				Player player,
+				int source){
+			final var singleMoves = new ArrayList<SingleMove>();
+			ArrayList<Integer> detectiveLocations = new ArrayList<>();
+
+			for (Player p : this.detectives) {
+				detectiveLocations.add(p.location());
+			}
+
+			for(int destination : setup.graph.adjacentNodes(source)) {
+				// TODO find out if destination is occupied by a detective
+				//  if the location is occupied, don't add to the list of moves to return
+				if (!(detectiveLocations.contains(destination))) {
+					//
+					for (Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {
+						// TODO find out if the player has the required tickets
+						//  if it does, construct SingleMove and add it the list of moves to return
+						if (player.hasAtLeast(t.requiredTicket(), 1)) {
+							singleMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(), destination));
+						}
+					}
+					// TODO consider the rules of secret moves here
+					//  add moves to the destination via a secret ticket if there are any left with the player
+					if (player.has(Ticket.SECRET)) {
+						singleMoves.add(new SingleMove(player.piece(), source, Ticket.SECRET, destination));
+					}
+				}
+			}
+			return ImmutableSet.copyOf(singleMoves);
+		}
+
+		@Override public ImmutableSet<Move> getAvailableMoves() {
+			List<SingleMove> sMoves = new ArrayList<>();
+			for (Player p : this.detectives) {
+				List<SingleMove> sPlayerMoves = List.copyOf(this.makeSingleMoves(this.setup,
+						this.detectives, p, p.location()));
+
+				sPlayerMoves.stream().forEach(move -> {sMoves.add(move);});
+			}
+			return ImmutableSet.copyOf(sMoves);
+
+			//return this.makeSingleMoves(this.setup, this.detectives, )
+		}
 
 
 	}
