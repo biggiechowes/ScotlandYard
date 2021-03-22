@@ -66,7 +66,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-			//detectives.add(mrX);
 			this.everyone = ImmutableSet.copyOf(pieceList);
 
 		}
@@ -127,12 +126,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			return this.winner;
 		}
 
-		private ImmutableSet<SingleMove> makeSingleMoves(
+		private ImmutableSet<SingleMove> getSingleMoves(
 				GameSetup setup,
 				List<Player> detectives,
 				Player player,
 				int source){
-			final var singleMoves = new ArrayList<SingleMove>();
+			var singleMoves = new ArrayList<SingleMove>();
 			ArrayList<Integer> detectiveLocations = new ArrayList<>();
 
 			for (Player p : this.detectives) {
@@ -140,19 +139,16 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 
 			for(int destination : setup.graph.adjacentNodes(source)) {
-				// TODO find out if destination is occupied by a detective
-				//  if the location is occupied, don't add to the list of moves to return
+
 				if (!(detectiveLocations.contains(destination))) {
-					//
+
 					for (Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {
-						// TODO find out if the player has the required tickets
-						//  if it does, construct SingleMove and add it the list of moves to return
-						if (player.hasAtLeast(t.requiredTicket(), 1)) {
+
+						if (player.has(t.requiredTicket())) {
 							singleMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(), destination));
 						}
 					}
-					// TODO consider the rules of secret moves here
-					//  add moves to the destination via a secret ticket if there are any left with the player
+
 					if (player.has(Ticket.SECRET)) {
 						singleMoves.add(new SingleMove(player.piece(), source, Ticket.SECRET, destination));
 					}
@@ -161,15 +157,66 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			return ImmutableSet.copyOf(singleMoves);
 		}
 
-		@Override public ImmutableSet<Move> getAvailableMoves() {
-			List<SingleMove> sMoves = new ArrayList<>();
-			for (Player p : this.detectives) {
-				List<SingleMove> sPlayerMoves = List.copyOf(this.makeSingleMoves(this.setup,
-						this.detectives, p, p.location()));
+		private ImmutableSet<DoubleMove> getDoubleMoves(
+				GameSetup setup,
+				List<Player> detectives,
+				Player player,
+				int source) {
 
-				sPlayerMoves.stream().forEach(move -> {sMoves.add(move);});
+			var doubleMoves = new ArrayList<DoubleMove>();
+			final var firstSingleMoves = getSingleMoves(setup, detectives, player, source);
+
+			if (player.has(Ticket.DOUBLE)) {
+
+				for (SingleMove sMove1 : firstSingleMoves) {
+
+					var secondSingleMoves =getSingleMoves(setup, detectives, player, sMove1.destination);
+
+					for (SingleMove sMove2 : secondSingleMoves) {
+
+						DoubleMove doubleMove = new DoubleMove(
+								player.piece(),
+								sMove1.source(),
+								sMove1.ticket,
+								sMove1.destination,
+								sMove2.ticket,
+								sMove2.destination
+						);
+
+						doubleMoves.add(doubleMove);
+
+					}
+				}
 			}
-			return ImmutableSet.copyOf(sMoves);
+
+			return ImmutableSet.copyOf(doubleMoves);
+
+		}
+
+		 @Nonnull @Override public ImmutableSet<Move> getAvailableMoves() {
+			//List<SingleMove> sMoves = new ArrayList<>();
+			/*for (Player p : this.detectives) {
+				 List<SingleMove> sPlayerMoves = List.copyOf(this.getSingleMoves(
+						 this.setup,
+						 this.detectives,
+						 p,
+						 p.location()));
+
+				 sPlayerMoves.forEach(move -> sMoves.add(move));
+			 }*/
+			 ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
+			List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
+					this.setup,
+					this.detectives,
+					mrX,
+					mrX.location()));
+
+			List<Move> moves = new ArrayList<>(List.copyOf(sMoves));
+			moves.addAll(dMoves);
+
+			return ImmutableSet.copyOf(moves);
+
+
 
 			//return this.makeSingleMoves(this.setup, this.detectives, )
 		}
