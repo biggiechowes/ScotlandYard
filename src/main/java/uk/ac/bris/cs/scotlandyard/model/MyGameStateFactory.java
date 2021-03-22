@@ -96,14 +96,14 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			class MyTicketBoard implements TicketBoard {
 
-				final Player p;
+				final Player player;
 
-				MyTicketBoard(Player p) {
-					this.p = p;
+				MyTicketBoard(Player player) {
+					this.player = player;
 				}
 
 				public int getCount(@Nonnull Ticket ticket) {
-					return this.p.tickets().get(ticket);
+					return this.player.tickets().get(ticket);
 				}
 			}
 
