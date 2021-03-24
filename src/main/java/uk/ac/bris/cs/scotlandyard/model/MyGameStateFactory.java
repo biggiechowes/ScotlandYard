@@ -70,18 +70,56 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 		// Methods
-		@Override public GameState advance(Move move) {  return null;  }
+		@Nonnull @Override
+		public GameState advance(Move move) {
+			if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
+
+			Visitor<Boolean> isDouble = new Visitor<Boolean>() {
+				@Override
+				public Boolean visit(SingleMove move) {
+					return false;
+				}
+
+				@Override
+				public Boolean visit(DoubleMove move) {
+					return true;
+				}
+			};
+
+
+
+		}
+
+		private void updateRemaining(Move move) {
+			List<Piece> remaining = new ArrayList<Piece>();
+			if (move.commencedBy() == mrX.piece()) {
+				detectives.forEach(detective -> remaining.add(detective.piece()));
+				this.remaining = ImmutableSet.copyOf(remaining);
+			}
+
+			else{
+				this.remaining.stream().
+						filter(x -> x != move.commencedBy()).
+						forEach(x -> remaining.add(x));
+				if(remaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
+				else this.remaining = ImmutableSet.copyOf(remaining);
+			}
+
+		}
 
 		// Getters
-		@Nonnull @Override public GameSetup getSetup() {
+		@Nonnull @Override
+		public GameSetup getSetup() {
 			return setup;
 		}
 
-		@Nonnull @Override public ImmutableSet<Piece> getPlayers() {
+		@Nonnull @Override
+		public ImmutableSet<Piece> getPlayers() {
 			return this.everyone;
 		}
 
-		@Nonnull @Override public Optional<Integer> getDetectiveLocation(Detective detective) {
+		@Nonnull @Override
+		public Optional<Integer> getDetectiveLocation(Detective detective) {
 			for (Player p : this.detectives) {
 
 				if (p.piece().webColour().equals(detective.webColour())) {
@@ -90,7 +128,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 			return Optional.empty();
 		}
-		@Nonnull @Override public Optional<TicketBoard> getPlayerTickets(Piece piece) {
+		@Nonnull @Override
+		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
 
 
 			class MyTicketBoard implements TicketBoard {
@@ -118,11 +157,13 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		}
 
 
-		@Nonnull @Override public ImmutableList<LogEntry> getMrXTravelLog() {
+		@Nonnull @Override
+		public ImmutableList<LogEntry> getMrXTravelLog() {
 			return log;
 		}
 
-		@Override public ImmutableSet<Piece> getWinner() {
+		@Override
+		public ImmutableSet<Piece> getWinner() {
 			return this.winner;
 		}
 
@@ -172,19 +213,21 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 					var secondSingleMoves =getSingleMoves(setup, detectives, player, sMove1.destination);
 
+
 					for (SingleMove sMove2 : secondSingleMoves) {
 
-						DoubleMove doubleMove = new DoubleMove(
-								player.piece(),
-								sMove1.source(),
-								sMove1.ticket,
-								sMove1.destination,
-								sMove2.ticket,
-								sMove2.destination
-						);
+						if(sMove1.ticket != sMove2.ticket || player.hasAtLeast(sMove1.ticket, 2)) {
+							DoubleMove doubleMove = new DoubleMove(
+									player.piece(),
+									sMove1.source(),
+									sMove1.ticket,
+									sMove1.destination,
+									sMove2.ticket,
+									sMove2.destination
+							);
 
-						doubleMoves.add(doubleMove);
-
+							doubleMoves.add(doubleMove);
+						}
 					}
 				}
 			}
@@ -193,7 +236,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 
-		 @Nonnull @Override public ImmutableSet<Move> getAvailableMoves() {
+		 @Nonnull @Override
+		 public ImmutableSet<Move> getAvailableMoves() {
 			//List<SingleMove> sMoves = new ArrayList<>();
 			/*for (Player p : this.detectives) {
 				 List<SingleMove> sPlayerMoves = List.copyOf(this.getSingleMoves(
@@ -204,6 +248,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 				 sPlayerMoves.forEach(move -> sMoves.add(move));
 			 }*/
+
+
+
 			 ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
 			List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
 					this.setup,
