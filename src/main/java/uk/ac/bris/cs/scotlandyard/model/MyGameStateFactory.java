@@ -86,13 +86,15 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			};
 
-
+			updateRemaining(move);
+			updateLocations(move);
+			updateTickets(move);
 
 		}
 
 		private void updateRemaining(Move move) {
 			List<Piece> remaining = new ArrayList<Piece>();
-			if (move.commencedBy() == mrX.piece()) {
+			if (move.commencedBy().isMrX()) {
 				detectives.forEach(detective -> remaining.add(detective.piece()));
 				this.remaining = ImmutableSet.copyOf(remaining);
 			}
@@ -105,6 +107,52 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				else this.remaining = ImmutableSet.copyOf(remaining);
 			}
 
+		}
+
+		private void updateLocations(Move move) {
+
+			Visitor<Integer> destination = new Visitor<Integer>() {
+				@Override
+				public Integer visit(SingleMove move) {
+					return move.destination;
+				}
+
+				@Override
+				public Integer visit(DoubleMove move) {
+					return move.destination2;
+				}
+			};
+
+			if (move.commencedBy().isMrX()){
+				mrX = mrX.at(move.visit(destination));
+			}
+			else {
+				for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
+					if(this.detectives.get(i).piece() == move.commencedBy()) {
+						this.detectives.set(i, this.detectives.get(i).at(move.visit(destination)));
+					}
+				}
+			}
+		}
+
+		private void updateTickets(Move move) {
+
+			Visitor<Iterable<Ticket>> tickets = new Visitor<ImmutableList<Ticket>>() {
+				@Override
+				public ImmutableList<Ticket> visit(SingleMove move) {
+					return ImmutableList.copyOf(move.tickets());
+				}
+
+				@Override
+				public Iterable<Ticket> visit(DoubleMove move) {
+					return move.tickets();
+				}
+			};
+
+			if (move.commencedBy().isMrX()) {
+				for (Ticket ticket : tickets) {
+				}
+			}
 		}
 
 		// Getters
