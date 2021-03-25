@@ -88,6 +88,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			updateRemaining(move);
 			updateLocations(move);
+			updateLog(move);
 			updateTickets(move);
 
 		}
@@ -102,10 +103,16 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			else{
 				this.remaining.stream().
 						filter(x -> x != move.commencedBy()).
-						forEach(x -> remaining.add(x));
-				if(remaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
-				else this.remaining = ImmutableSet.copyOf(remaining);
+						forEach(x -> detectives.stream()
+							.filter(detective -> detective.piece() != x &&
+										Arrays.stream(Ticket.values()).
+												anyMatch(detective::has))
+							.map(detective -> x)
+							.forEach(remaining::add)
+						);
 			}
+			if(remaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
+			else this.remaining = ImmutableSet.copyOf(remaining);
 
 		}
 
@@ -135,24 +142,70 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 		}
 
-		private void updateTickets(Move move) {
+		private void updateLog(Move move) {
 
-			Visitor<Iterable<Ticket>> tickets = new Visitor<ImmutableList<Ticket>>() {
+			Visitor<ImmutableList<Ticket>> tickets = new Visitor<ImmutableList<Ticket>>() {
 				@Override
 				public ImmutableList<Ticket> visit(SingleMove move) {
 					return ImmutableList.copyOf(move.tickets());
 				}
 
 				@Override
-				public Iterable<Ticket> visit(DoubleMove move) {
-					return move.tickets();
+				public ImmutableList<Ticket> visit(DoubleMove move) {
+					return ImmutableList.copyOf(move.tickets());
+				}
+			};
+
+			Visitor<ImmutableList<Integer>> destinations = new Visitor<ImmutableList<Integer>>() {
+				@Override
+				public ImmutableList<Integer> visit(SingleMove move) {
+					return ImmutableList.of(move.destination);
+				}
+
+				@Override
+				public ImmutableList<Integer> visit(DoubleMove move) {
+					return ImmutableList.of(move.destination1, move.destination2);
+				}
+			};
+
+			if(move.commencedBy().isMrX()){
+
+				updateLog(move);
+
+			}
+
+		}
+
+		private void updateTickets(Move move) {
+
+			Visitor<List<Ticket>> tickets = new Visitor<List<Ticket>>() {
+				@Override
+				public ImmutableList<Ticket> visit(SingleMove move) {
+					return ImmutableList.copyOf(move.tickets());
+				}
+
+				@Override
+				public ImmutableList<Ticket> visit(DoubleMove move) {
+					return ImmutableList.copyOf(move.tickets());
 				}
 			};
 
 			if (move.commencedBy().isMrX()) {
-				for (Ticket ticket : tickets) {
+				for (Ticket ticket : move.visit(tickets)) {
+					mrX.use(ticket);
 				}
 			}
+			else {
+				for (Ticket ticket : move.visit(tickets)) {
+					for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
+						if (this.detectives.get(i).piece() == move.commencedBy()) {
+							this.detectives.get(i).use(ticket);
+							mrX.give(ticket);
+						}
+					}
+				}
+			}
+
 		}
 
 		// Getters
