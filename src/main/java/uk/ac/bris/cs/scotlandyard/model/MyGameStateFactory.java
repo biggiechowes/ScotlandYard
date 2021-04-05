@@ -8,6 +8,7 @@ import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.Move.*;
 import uk.ac.bris.cs.scotlandyard.model.Piece.*;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.*;
+import uk.ac.bris.cs.scotlandyard.model.LogEntry.*;
 
 public final class MyGameStateFactory implements Factory<GameState> {
 	@Nonnull @Override public GameState build(GameSetup setup, Player mrX, ImmutableList<Player> detectives) {
@@ -23,7 +24,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private List<Player> detectives;
 		private ImmutableSet<Piece> everyone;
 		private ImmutableSet<Move> moves;
-		private ImmutableSet<Piece> winner = ImmutableSet.of();
+		private ImmutableSet<Piece> winner;
+		private ImmutableList<Boolean> remainingRounds;
 
 		//Constructor
 		private MyGameState(final GameSetup setup, final ImmutableSet<Piece> remaining, final ImmutableList<
@@ -62,6 +64,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			// Initialisation
 			this.setup = setup;
+			List<Boolean> bufferRemainingRounds = new ArrayList<>(this.setup.rounds);
+			for(LogEntry logEntry : log){
+				bufferRemainingRounds.remove(0);
+			}
+			this.remainingRounds = ImmutableList.copyOf(bufferRemainingRounds);
 			this.remaining = remaining;
 			this.log = log;
 			this.mrX = mrX;
@@ -72,24 +79,16 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		// Methods
 		@Nonnull @Override
 		public GameState advance(Move move) {
+			this.moves = this.getAvailableMoves();
 			if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
-			Visitor<Boolean> isDouble = new Visitor<Boolean>() {
-				@Override
-				public Boolean visit(SingleMove move) {
-					return false;
-				}
-
-				@Override
-				public Boolean visit(DoubleMove move) {
-					return true;
-				}
-			};
-
+			updateLog(move);
 			updateRemaining(move);
 			updateLocations(move);
-			updateLog(move);
 			updateTickets(move);
+
+			return new MyGameState(this.setup, this.remaining, this.log,
+					this.mrX, this.detectives);
 
 		}
 
@@ -104,11 +103,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				this.remaining.stream().
 						filter(x -> x != move.commencedBy()).
 						forEach(x -> detectives.stream()
-							.filter(detective -> detective.piece() != x &&
+								.filter(detective -> detective.piece() != x &&
 										Arrays.stream(Ticket.values()).
 												anyMatch(detective::has))
-							.map(detective -> x)
-							.forEach(remaining::add)
+								.map(detective -> x)
+								.forEach(remaining::add)
 						);
 			}
 			if(remaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
@@ -119,8 +118,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private void updateLocations(Move move) {
 
 			Visitor<Integer> destination = new Visitor<Integer>() {
-				@Override
-				public Integer visit(SingleMove move) {
+ 				public Integer visit(SingleMove move) {
 					return move.destination;
 				}
 
@@ -136,7 +134,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			else {
 				for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
 					if(this.detectives.get(i).piece() == move.commencedBy()) {
-						this.detectives.set(i, this.detectives.get(i).at(move.visit(destination)));
+						List<Player> buffer = new ArrayList<>(this.detectives);
+						buffer.set(i, this.detectives.get(i).at(move.visit(destination)));
+						this.detectives = buffer;
 					}
 				}
 			}
@@ -168,12 +168,24 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			};
 
-			if(move.commencedBy().isMrX()){
 
-				updateLog(move);
 
+			if(move.commencedBy().isMrX()) {
+				List<LogEntry> newLog = new ArrayList<>(this.log);
+
+				for (int i = 0; i <= move.visit(destinations).size() - 1; i++) {
+
+
+					if (this.remainingRounds.get(i)) { // if current round is reveal
+						newLog.add(LogEntry.reveal(move.visit(tickets).get(i),
+								move.visit(destinations).get(i)));
+					} else {
+						newLog.add(LogEntry.hidden(move.visit(tickets).get(i)));
+					}
+
+				}
+				this.log = ImmutableList.copyOf(newLog);
 			}
-
 		}
 
 		private void updateTickets(Move move) {
@@ -192,15 +204,15 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			if (move.commencedBy().isMrX()) {
 				for (Ticket ticket : move.visit(tickets)) {
-					mrX.use(ticket);
+					mrX = mrX.use(ticket);
 				}
 			}
 			else {
 				for (Ticket ticket : move.visit(tickets)) {
 					for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
 						if (this.detectives.get(i).piece() == move.commencedBy()) {
-							this.detectives.get(i).use(ticket);
-							mrX.give(ticket);
+							this.detectives.set(i, this.detectives.get(i).use(ticket));
+							mrX = mrX.give(ticket);
 						}
 					}
 				}
@@ -263,9 +275,40 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			return log;
 		}
 
-		@Override
+		@Nonnull @Override
 		public ImmutableSet<Piece> getWinner() {
-			return this.winner;
+
+			List<Piece> winner = new ArrayList<>();
+			ImmutableSet<Piece> bufferRemaining = this.remaining;
+			List<Piece> detectivePieces = new ArrayList<>();
+			this.detectives.forEach(x -> detectivePieces.add(x.piece()));
+
+			// Detective Winning Scenarios
+			for (Player detective : this.detectives) { // mrX is captured
+				if (detective.location() == this.mrX.location()) {
+					winner = detectivePieces;
+					break;
+				}
+			}
+
+			this.remaining = ImmutableSet.of(this.mrX.piece());
+			if (this.getAvailableMoves().isEmpty()) { // mrX is stuck or has no tickets
+				winner = detectivePieces;
+			}
+			this.remaining = bufferRemaining;
+
+			// MrX Winning Scenarios
+			if(this.remainingRounds.isEmpty()){ //there are no more remaining rounds
+				winner.add(this.mrX.piece());
+			}
+			this.remaining = ImmutableSet.copyOf(detectivePieces);
+			if(getAvailableMoves().isEmpty()){ //if detectives are out of tickets or stuck
+				winner.add(this.mrX.piece());
+			}
+			this.remaining = bufferRemaining;
+
+
+			return ImmutableSet.copyOf(winner);
 		}
 
 		private ImmutableSet<SingleMove> getSingleMoves(
@@ -308,7 +351,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			var doubleMoves = new ArrayList<DoubleMove>();
 			final var firstSingleMoves = getSingleMoves(setup, detectives, player, source);
 
-			if (player.has(Ticket.DOUBLE)) {
+			if (player.has(Ticket.DOUBLE) && this.remainingRounds.size() > 1) {
 
 				for (SingleMove sMove1 : firstSingleMoves) {
 
@@ -337,38 +380,30 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 
-		 @Nonnull @Override
-		 public ImmutableSet<Move> getAvailableMoves() {
-			//List<SingleMove> sMoves = new ArrayList<>();
-			/*for (Player p : this.detectives) {
-				 List<SingleMove> sPlayerMoves = List.copyOf(this.getSingleMoves(
-						 this.setup,
-						 this.detectives,
-						 p,
-						 p.location()));
+		@Nonnull @Override
+		public ImmutableSet<Move> getAvailableMoves() {
 
-				 sPlayerMoves.forEach(move -> sMoves.add(move));
-			 }*/
+			//if (!winner.isEmpty()) return ImmutableSet.of();
 
-
-
-			 ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
-			List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
-					this.setup,
-					this.detectives,
-					mrX,
-					mrX.location()));
-
-			List<Move> moves = new ArrayList<>(List.copyOf(sMoves));
-			moves.addAll(dMoves);
-
-			return ImmutableSet.copyOf(moves);
-
-
-
-			//return this.makeSingleMoves(this.setup, this.detectives, )
-		}
-
-
+			List<Move> moves = new ArrayList<>();
+				if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
+					ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
+					List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
+							this.setup,
+							this.detectives,
+							mrX,
+							mrX.location()));
+					moves.addAll(sMoves);
+					moves.addAll(dMoves);
+				} else { // get detective moves
+					for (Player p : this.detectives) {
+						if (this.remaining.contains(p.piece())) {
+							ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
+							moves.addAll(sMoves);
+						}
+					}
+				}
+				return ImmutableSet.copyOf(moves);
+			}
 	}
 }
