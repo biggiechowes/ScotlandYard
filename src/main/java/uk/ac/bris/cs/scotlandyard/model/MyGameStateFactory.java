@@ -300,7 +300,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 
 			//MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty()) { //last round and mrX is not caught
+			if(this.remainingRounds.isEmpty() && this.remaining.isEmpty()) { //last round and mrX is not caught
 				winner.add(this.mrX.piece());
 			}
 			boolean detectivesHaveTickets = false;
