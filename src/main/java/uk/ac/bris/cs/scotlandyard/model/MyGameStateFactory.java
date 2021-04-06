@@ -24,7 +24,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private List<Player> detectives;
 		private ImmutableSet<Piece> everyone;
 		private ImmutableSet<Move> moves;
-		private ImmutableSet<Piece> winner;
+		//private ImmutableSet<Piece> winner;
 		private ImmutableList<Boolean> remainingRounds;
 
 		//Constructor
@@ -74,6 +74,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.mrX = mrX;
 			this.detectives = detectives;
 			this.everyone = ImmutableSet.copyOf(pieceList);
+			//this.winner =  getWinner();
 
 		}
 		// Methods
@@ -279,33 +280,42 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		public ImmutableSet<Piece> getWinner() {
 
 			List<Piece> winner = new ArrayList<>();
-			ImmutableSet<Piece> bufferRemaining = this.remaining;
 			List<Piece> detectivePieces = new ArrayList<>();
 			this.detectives.forEach(x -> detectivePieces.add(x.piece()));
+			int impossibleDestinations = 0;
 
 			// Detective Winning Scenarios
-			for (Player detective : this.detectives) { // mrX is captured
-				if (detective.location() == this.mrX.location()) {
+			for (Player detective : this.detectives) {
+				if (detective.location() == this.mrX.location()) { // mrX is captured
 					winner = detectivePieces;
-					break;
+				}
+				for(int destination : setup.graph.adjacentNodes(this.mrX.location())) {
+					if (detective.location() == destination) {
+						impossibleDestinations++;
+					}
 				}
 			}
-
-			this.remaining = ImmutableSet.of(this.mrX.piece());
-			if (this.getAvailableMoves().isEmpty()) { // mrX is stuck or has no tickets
+			if(impossibleDestinations == setup.graph.adjacentNodes(this.mrX.location()).size()){ //mrX is stuck
 				winner = detectivePieces;
 			}
-			this.remaining = bufferRemaining;
 
-			// MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty()){ //there are no more remaining rounds
+			//MrX Winning Scenarios
+			if(this.remainingRounds.isEmpty()) { //last round and mrX is not caught
 				winner.add(this.mrX.piece());
 			}
-			this.remaining = ImmutableSet.copyOf(detectivePieces);
-			if(getAvailableMoves().isEmpty()){ //if detectives are out of tickets or stuck
+			boolean detectivesHaveTickets = false;
+			for(Player detective : this.detectives) {
+				for(Ticket ticket : ScotlandYard.Ticket.values()) {
+					if (detective.has(ticket)) {
+						detectivesHaveTickets = true;
+						break;
+					}
+				}
+				if(detectivesHaveTickets) break;
+			}
+			if(!detectivesHaveTickets){ //detectives have no remaining tickets
 				winner.add(this.mrX.piece());
 			}
-			this.remaining = bufferRemaining;
 
 
 			return ImmutableSet.copyOf(winner);
@@ -383,7 +393,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull @Override
 		public ImmutableSet<Move> getAvailableMoves() {
 
-			//if (!winner.isEmpty()) return ImmutableSet.of();
+			if (!getWinner().isEmpty()) return ImmutableSet.of();
 
 			List<Move> moves = new ArrayList<>();
 				if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
