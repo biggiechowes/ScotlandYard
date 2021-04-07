@@ -27,6 +27,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		//private ImmutableSet<Piece> winner;
 		private ImmutableList<Boolean> remainingRounds;
 
+
 		//Constructor
 		private MyGameState(final GameSetup setup, final ImmutableSet<Piece> remaining, final ImmutableList<
 				LogEntry> log, final Player mrX, final List<Player> detectives) {
@@ -64,12 +65,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			// Initialisation
 			this.setup = setup;
+			this.remaining = remaining;
 			List<Boolean> bufferRemainingRounds = new ArrayList<>(this.setup.rounds);
 			for(LogEntry logEntry : log){
 				bufferRemainingRounds.remove(0);
 			}
 			this.remainingRounds = ImmutableList.copyOf(bufferRemainingRounds);
-			this.remaining = remaining;
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
@@ -87,6 +88,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			updateRemaining(move);
 			updateLocations(move);
 			updateTickets(move);
+
+
 
 			return new MyGameState(this.setup, this.remaining, this.log,
 					this.mrX, this.detectives);
@@ -280,42 +283,33 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		public ImmutableSet<Piece> getWinner() {
 
 			List<Piece> winner = new ArrayList<>();
+			ImmutableSet<Piece> bufferRemaining = this.remaining;
 			List<Piece> detectivePieces = new ArrayList<>();
 			this.detectives.forEach(x -> detectivePieces.add(x.piece()));
-			int impossibleDestinations = 0;
 
 			// Detective Winning Scenarios
-			for (Player detective : this.detectives) {
-				if (detective.location() == this.mrX.location()) { // mrX is captured
+			for (Player detective : this.detectives) { // mrX is captured
+				if (detective.location() == this.mrX.location()) {
 					winner = detectivePieces;
+					break;
 				}
-				for(int destination : setup.graph.adjacentNodes(this.mrX.location())) {
-					if (detective.location() == destination) {
-						impossibleDestinations++;
-					}
-				}
-			}
-			if(impossibleDestinations == setup.graph.adjacentNodes(this.mrX.location()).size()){ //mrX is stuck
-				winner = detectivePieces;
 			}
 
-			//MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty() && this.remaining.isEmpty()) { //last round and mrX is not caught
+			this.remaining = ImmutableSet.of(this.mrX.piece());
+			if (this.getMoves().isEmpty()) { // mrX is stuck or has no tickets
+				winner = detectivePieces;
+			}
+			this.remaining = bufferRemaining;
+
+			// MrX Winning Scenarios
+			if(this.remainingRounds.isEmpty() && this.remaining.isEmpty()){ //there are no more remaining rounds
 				winner.add(this.mrX.piece());
 			}
-			boolean detectivesHaveTickets = false;
-			for(Player detective : this.detectives) {
-				for(Ticket ticket : ScotlandYard.Ticket.values()) {
-					if (detective.has(ticket)) {
-						detectivesHaveTickets = true;
-						break;
-					}
-				}
-				if(detectivesHaveTickets) break;
-			}
-			if(!detectivesHaveTickets){ //detectives have no remaining tickets
+			this.remaining = ImmutableSet.copyOf(detectivePieces);
+			if(getMoves().isEmpty()){ //if detectives are out of tickets or stuck
 				winner.add(this.mrX.piece());
 			}
+			this.remaining = bufferRemaining;
 
 
 			return ImmutableSet.copyOf(winner);
@@ -390,30 +384,35 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 
+		private ImmutableSet<Move> getMoves() {
+
+			List<Move> moves = new ArrayList<>();
+			if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
+				ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
+				List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
+						this.setup,
+						this.detectives,
+						mrX,
+						mrX.location()));
+				moves.addAll(sMoves);
+				moves.addAll(dMoves);
+			} else { // get detective moves
+				for (Player p : this.detectives) {
+					if (this.remaining.contains(p.piece())) {
+						ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
+						moves.addAll(sMoves);
+					}
+				}
+			}
+			return ImmutableSet.copyOf(moves);
+		}
+
 		@Nonnull @Override
 		public ImmutableSet<Move> getAvailableMoves() {
 
 			if (!getWinner().isEmpty()) return ImmutableSet.of();
+			return getMoves();
+		}
 
-			List<Move> moves = new ArrayList<>();
-				if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
-					ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
-					List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
-							this.setup,
-							this.detectives,
-							mrX,
-							mrX.location()));
-					moves.addAll(sMoves);
-					moves.addAll(dMoves);
-				} else { // get detective moves
-					for (Player p : this.detectives) {
-						if (this.remaining.contains(p.piece())) {
-							ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
-							moves.addAll(sMoves);
-						}
-					}
-				}
-				return ImmutableSet.copyOf(moves);
-			}
 	}
 }
