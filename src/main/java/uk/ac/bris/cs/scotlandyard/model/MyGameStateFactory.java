@@ -81,7 +81,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		// Methods
 		@Nonnull @Override
 		public GameState advance(Move move) {
-			this.moves = this.getAvailableMoves();
+
+
+			this.moves = this.getMoves();
 			if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
 			updateLog(move);
@@ -296,7 +298,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 
 			this.remaining = ImmutableSet.of(this.mrX.piece());
-			if (this.getMoves().isEmpty()) { // mrX is stuck or has no tickets
+			if (getMoves().isEmpty()) { // mrX is stuck or has no tickets
 				winner = detectivePieces;
 			}
 			this.remaining = bufferRemaining;
