@@ -304,7 +304,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.remaining = bufferRemaining;
 
 			// MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty() && this.remaining.isEmpty()){ //there are no more remaining rounds
+			if(this.remainingRounds.isEmpty() && this.remaining.contains(mrX.piece())){ //there are no more remaining rounds
 				winner.add(this.mrX.piece());
 			}
 			this.remaining = ImmutableSet.copyOf(detectivePieces);
@@ -401,6 +401,13 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			} else { // get detective moves
 				for (Player p : this.detectives) {
 					if (this.remaining.contains(p.piece())) {
+						if (!p.has(Ticket.TAXI) &&
+								!p.has(Ticket.BUS) &&
+								!p.has(Ticket.UNDERGROUND) ) {
+							HashSet<Piece> bufferRemaining = new HashSet<>(this.remaining);
+							bufferRemaining.remove(p.piece());
+							this.remaining = ImmutableSet.copyOf(bufferRemaining);
+						}
 						ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
 						moves.addAll(sMoves);
 					}
