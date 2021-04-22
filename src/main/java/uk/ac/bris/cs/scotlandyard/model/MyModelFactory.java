@@ -5,7 +5,7 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
 
 import com.google.common.collect.ImmutableSet;
-import org.jetbrains.annotations.NotNull;
+
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 
 import java.util.ArrayList;
@@ -23,7 +23,7 @@ public final class MyModelFactory implements Factory<Model> {
 
 	public Model myModel = new Model() {
 
-		@NotNull
+		@Nonnull
 		@Override
 		public Board getCurrentBoard() {
 			return state;
@@ -50,14 +50,14 @@ public final class MyModelFactory implements Factory<Model> {
 			observers = ImmutableSet.copyOf(bufferObservers);
 		}
 
-		@NotNull
+		@Nonnull
 		@Override
 		public ImmutableSet<Observer> getObservers() {
 			return observers;
 		}
 
 		@Override
-		public void chooseMove(@NotNull Move move) {
+		public void chooseMove(@Nonnull Move move) {
 			state = state.advance(move);
 			Observer.Event event;
 

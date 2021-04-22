@@ -1,6 +1,3 @@
-//    DONE!!!
-
-
 package uk.ac.bris.cs.scotlandyard.model;
 
 import com.google.common.collect.ImmutableList;
@@ -27,7 +24,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private List<Player> detectives;
 		private ImmutableSet<Piece> everyone;
 		private ImmutableSet<Move> moves;
-		//private ImmutableSet<Piece> winner;
 		private ImmutableList<Boolean> remainingRounds;
 
 
@@ -43,6 +39,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (detectives.isEmpty()) throw new IllegalArgumentException("detectives is empty!");
 			if (setup.graph.nodes().isEmpty()) throw new IllegalArgumentException("empty graph!");
 
+			//Test to ensure valid player states
 			List<Player> encounteredDetectives = new ArrayList<>();
 			List<Integer> encounteredLocations = new ArrayList<>();
 			for (Player p : detectives) {
@@ -58,37 +55,45 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				encounteredLocations.add(p.location());
 			}
 
-			List<Piece> pieceList = new ArrayList<>();
-			for (Player p : detectives) {
-				pieceList.add(p.piece());
-			}
-			pieceList.add(mrX.piece());
 
 
 
 			// Initialisation
 			this.setup = setup;
 			this.remaining = remaining;
+
+			//remainingRounds requires a buffer variable
 			List<Boolean> bufferRemainingRounds = new ArrayList<>(this.setup.rounds);
 			for(LogEntry logEntry : log){
 				bufferRemainingRounds.remove(0);
 			}
+
 			this.remainingRounds = ImmutableList.copyOf(bufferRemainingRounds);
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-			this.everyone = ImmutableSet.copyOf(pieceList);
-			//this.winner =  getWinner();
+
+			//everyone requires a buffer variable
+			List<Piece> bufferEveryone = new ArrayList<>();
+			for (Player p : detectives) {
+				bufferEveryone.add(p.piece());
+			}
+			bufferEveryone.add(mrX.piece());
+
+			this.everyone = ImmutableSet.copyOf(bufferEveryone);
+			this.moves = this.getMoves();
 
 		}
 		// Methods
 		@Nonnull @Override
 		public GameState advance(Move move) {
 
-
-			this.moves = this.getMoves();
+			//Test for illegal move
 			if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
+
+			//advance calls helper methods to update required attributes and then returns
+			//a new MyGameState object
 			updateLog(move);
 			updateRemaining(move);
 			updateLocations(move);
@@ -101,31 +106,40 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 
-		private void updateRemaining(Move move) {
-			List<Piece> remaining = new ArrayList<Piece>();
+		private void updateRemaining(@Nonnull Move move) {
+
+			List<Piece> bufferRemaining = new ArrayList<>();
+
+			//this.remaining alternates between the remaining detectives and mrX
+
+
+			//if mrX is the one who moved, the remaining players in the round are all the detectives
 			if (move.commencedBy().isMrX()) {
-				detectives.forEach(detective -> remaining.add(detective.piece()));
-				this.remaining = ImmutableSet.copyOf(remaining);
+				detectives.forEach(detective -> bufferRemaining.add(detective.piece()));
+				this.remaining = ImmutableSet.copyOf(bufferRemaining);
 			}
 
 			else{
-				this.remaining.stream().
-						filter(x -> x != move.commencedBy()).
-						forEach(x -> detectives.stream()
-								.filter(detective -> detective.piece() != x &&
-										Arrays.stream(Ticket.values()).
-												anyMatch(detective::has))
-								.map(detective -> x)
-								.forEach(remaining::add)
+				//this lambda function adds all the remaining players to bufferRemaining
+				this.remaining.stream()
+						.filter(x -> x != move.commencedBy())//the player who commenced the move is filtered out
+						.forEach(x -> detectives.stream()//for each player in remaining all the detectives are streamed
+								.filter(detective -> detective.piece() == x &&
+										Arrays.stream(Ticket.values()).anyMatch(detective::has))//the detectives who have no tickets are filtered out
+								.map(detective -> x)//the detectives are mapped back into this.remaining
+								.forEach(bufferRemaining::add)//and then they are added tho the local list
 						);
 			}
-			if(remaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
-			else this.remaining = ImmutableSet.copyOf(remaining);
+			//if the list of remaining players is empty that means that all detective have used their turn
+			//and it is the start of a new round, so the remaining player is mrX
+			if(bufferRemaining.isEmpty()) this.remaining = ImmutableSet.of(mrX.piece());
+			else this.remaining = ImmutableSet.copyOf(bufferRemaining);
 
 		}
 
-		private void updateLocations(Move move) {
+		private void updateLocations(@Nonnull Move move) {
 
+			//visitor pattern is used here to get the final destination of the move
 			Visitor<Integer> destination = new Visitor<Integer>() {
  				public Integer visit(SingleMove move) {
 					return move.destination;
@@ -141,18 +155,21 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				mrX = mrX.at(move.visit(destination));
 			}
 			else {
-				for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
+				for (int i = 0; i <= this.detectives.size() - 1; i++) {
 					if(this.detectives.get(i).piece() == move.commencedBy()) {
-						List<Player> buffer = new ArrayList<>(this.detectives);
-						buffer.set(i, this.detectives.get(i).at(move.visit(destination)));
-						this.detectives = buffer;
+						List<Player> bufferDetectives = new ArrayList<>(this.detectives);
+						bufferDetectives.set(i, this.detectives.get(i).at(move.visit(destination)));
+						this.detectives = bufferDetectives;
 					}
 				}
 			}
 		}
 
-		private void updateLog(Move move) {
+		private void updateLog(@Nonnull Move move) {
 
+
+			//visitor pattern is used to get the tickets and the destinations of the move as lists
+			//to avoid special cases for single or double moves
 			Visitor<ImmutableList<Ticket>> tickets = new Visitor<ImmutableList<Ticket>>() {
 				@Override
 				public ImmutableList<Ticket> visit(SingleMove move) {
@@ -178,27 +195,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			};
 
 
-
+			//the log concerns only mrX
 			if(move.commencedBy().isMrX()) {
-				List<LogEntry> newLog = new ArrayList<>(this.log);
+				List<LogEntry> bufferLog = new ArrayList<>(this.log);
 
 				for (int i = 0; i <= move.visit(destinations).size() - 1; i++) {
-
-
-					if (this.remainingRounds.get(i)) { // if current round is reveal
-						newLog.add(LogEntry.reveal(move.visit(tickets).get(i),
+					if (this.remainingRounds.get(i)) { // if current round is reveal the log entry is added accordingly
+						bufferLog.add(LogEntry.reveal(move.visit(tickets).get(i),
 								move.visit(destinations).get(i)));
 					} else {
-						newLog.add(LogEntry.hidden(move.visit(tickets).get(i)));
+						bufferLog.add(LogEntry.hidden(move.visit(tickets).get(i)));
 					}
-
 				}
-				this.log = ImmutableList.copyOf(newLog);
+				this.log = ImmutableList.copyOf(bufferLog);
 			}
 		}
 
-		private void updateTickets(Move move) {
+		private void updateTickets(@Nonnull Move move) {
 
+			//visitor pattern is used to get the tickets as a list
 			Visitor<List<Ticket>> tickets = new Visitor<List<Ticket>>() {
 				@Override
 				public ImmutableList<Ticket> visit(SingleMove move) {
@@ -218,8 +233,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 			else {
 				for (Ticket ticket : move.visit(tickets)) {
-					for (Integer i = 0; i <= this.detectives.size() - 1; i++) {
+					for (int i = 0; i <= this.detectives.size() - 1; i++) {
 						if (this.detectives.get(i).piece() == move.commencedBy()) {
+							//tickets used by detectives are given to mrX
 							this.detectives.set(i, this.detectives.get(i).use(ticket));
 							mrX = mrX.give(ticket);
 						}
@@ -250,10 +266,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 			return Optional.empty();
 		}
+
 		@Nonnull @Override
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
 
-
+			//internal subclass that implements TicketBoard
 			class MyTicketBoard implements TicketBoard {
 
 				final Player player;
@@ -267,14 +284,15 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			}
 
+			if (piece == this.mrX.piece()) {
+				return Optional.of(new MyTicketBoard(this.mrX));
+			}
 			for (Player p : this.detectives) {
 				if (p.piece() == piece) {
 					return Optional.of(new MyTicketBoard(p));
 				}
 			}
-			if (piece == this.mrX.piece()) {
-				return Optional.of(new MyTicketBoard(this.mrX));
-			}
+
 			return Optional.empty();
 		}
 
@@ -393,25 +411,29 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			List<Move> moves = new ArrayList<>();
 			if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
-				ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
-				List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
-						this.setup,
-						this.detectives,
+				ImmutableSet<SingleMove> sMoves = getSingleMoves(
+						setup,
+						detectives,
 						mrX,
-						mrX.location()));
+						mrX.location()
+				);
+				List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
+						setup,
+						detectives,
+						mrX,
+						mrX.location()
+				));
 				moves.addAll(sMoves);
 				moves.addAll(dMoves);
 			} else { // get detective moves
 				for (Player p : this.detectives) {
 					if (this.remaining.contains(p.piece())) {
-						if (!p.has(Ticket.TAXI) &&
-								!p.has(Ticket.BUS) &&
-								!p.has(Ticket.UNDERGROUND) ) {
-							HashSet<Piece> bufferRemaining = new HashSet<>(this.remaining);
-							bufferRemaining.remove(p.piece());
-							this.remaining = ImmutableSet.copyOf(bufferRemaining);
-						}
-						ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
+						ImmutableSet<SingleMove> sMoves = getSingleMoves(
+								setup,
+								detectives,
+								p,
+								p.location()
+						);
 						moves.addAll(sMoves);
 					}
 				}
@@ -422,7 +444,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull @Override
 		public ImmutableSet<Move> getAvailableMoves() {
 
+			//getAvailableMoves returns an empty list if the game is over, i.e. winners are declared
 			if (!getWinner().isEmpty()) return ImmutableSet.of();
+			//getMoves is a helper method that return all available moves
 			return getMoves();
 		}
 
