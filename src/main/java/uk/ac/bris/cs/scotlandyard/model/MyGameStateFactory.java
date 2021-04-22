@@ -1,3 +1,6 @@
+//    DONE!!!
+
+
 package uk.ac.bris.cs.scotlandyard.model;
 
 import com.google.common.collect.ImmutableList;
@@ -24,8 +27,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private List<Player> detectives;
 		private ImmutableSet<Piece> everyone;
 		private ImmutableSet<Move> moves;
-		private ImmutableSet<Piece> winner;
+		//private ImmutableSet<Piece> winner;
 		private ImmutableList<Boolean> remainingRounds;
+
 
 		//Constructor
 		private MyGameState(final GameSetup setup, final ImmutableSet<Piece> remaining, final ImmutableList<
@@ -64,28 +68,33 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			// Initialisation
 			this.setup = setup;
+			this.remaining = remaining;
 			List<Boolean> bufferRemainingRounds = new ArrayList<>(this.setup.rounds);
 			for(LogEntry logEntry : log){
 				bufferRemainingRounds.remove(0);
 			}
 			this.remainingRounds = ImmutableList.copyOf(bufferRemainingRounds);
-			this.remaining = remaining;
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
 			this.everyone = ImmutableSet.copyOf(pieceList);
+			//this.winner =  getWinner();
 
 		}
 		// Methods
 		@Nonnull @Override
 		public GameState advance(Move move) {
-			this.moves = this.getAvailableMoves();
+
+
+			this.moves = this.getMoves();
 			if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
 			updateLog(move);
 			updateRemaining(move);
 			updateLocations(move);
 			updateTickets(move);
+
+
 
 			return new MyGameState(this.setup, this.remaining, this.log,
 					this.mrX, this.detectives);
@@ -292,17 +301,17 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			}
 
 			this.remaining = ImmutableSet.of(this.mrX.piece());
-			if (this.getAvailableMoves().isEmpty()) { // mrX is stuck or has no tickets
+			if (getMoves().isEmpty()) { // mrX is stuck or has no tickets
 				winner = detectivePieces;
 			}
 			this.remaining = bufferRemaining;
 
 			// MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty()){ //there are no more remaining rounds
+			if(this.remainingRounds.isEmpty() && this.remaining.contains(mrX.piece())){ //there are no more remaining rounds
 				winner.add(this.mrX.piece());
 			}
 			this.remaining = ImmutableSet.copyOf(detectivePieces);
-			if(getAvailableMoves().isEmpty()){ //if detectives are out of tickets or stuck
+			if(getMoves().isEmpty()){ //if detectives are out of tickets or stuck
 				winner.add(this.mrX.piece());
 			}
 			this.remaining = bufferRemaining;
@@ -380,30 +389,42 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		}
 
+		private ImmutableSet<Move> getMoves() {
+
+			List<Move> moves = new ArrayList<>();
+			if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
+				ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
+				List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
+						this.setup,
+						this.detectives,
+						mrX,
+						mrX.location()));
+				moves.addAll(sMoves);
+				moves.addAll(dMoves);
+			} else { // get detective moves
+				for (Player p : this.detectives) {
+					if (this.remaining.contains(p.piece())) {
+						if (!p.has(Ticket.TAXI) &&
+								!p.has(Ticket.BUS) &&
+								!p.has(Ticket.UNDERGROUND) ) {
+							HashSet<Piece> bufferRemaining = new HashSet<>(this.remaining);
+							bufferRemaining.remove(p.piece());
+							this.remaining = ImmutableSet.copyOf(bufferRemaining);
+						}
+						ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
+						moves.addAll(sMoves);
+					}
+				}
+			}
+			return ImmutableSet.copyOf(moves);
+		}
+
 		@Nonnull @Override
 		public ImmutableSet<Move> getAvailableMoves() {
 
-			//if (!winner.isEmpty()) return ImmutableSet.of();
+			if (!getWinner().isEmpty()) return ImmutableSet.of();
+			return getMoves();
+		}
 
-			List<Move> moves = new ArrayList<>();
-				if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
-					ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, mrX, mrX.location());
-					List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
-							this.setup,
-							this.detectives,
-							mrX,
-							mrX.location()));
-					moves.addAll(sMoves);
-					moves.addAll(dMoves);
-				} else { // get detective moves
-					for (Player p : this.detectives) {
-						if (this.remaining.contains(p.piece())) {
-							ImmutableSet<SingleMove> sMoves = getSingleMoves(setup, detectives, p, p.location());
-							moves.addAll(sMoves);
-						}
-					}
-				}
-				return ImmutableSet.copyOf(moves);
-			}
 	}
 }
