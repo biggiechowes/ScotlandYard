@@ -306,30 +306,40 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		public ImmutableSet<Piece> getWinner() {
 
 			List<Piece> winner = new ArrayList<>();
+			//since getMoves returns the moves for remaining players, a copy of this.remaining is
+			//necessary to store the initial value
 			ImmutableSet<Piece> bufferRemaining = this.remaining;
 			List<Piece> detectivePieces = new ArrayList<>();
 			this.detectives.forEach(x -> detectivePieces.add(x.piece()));
 
 			// Detective Winning Scenarios
-			for (Player detective : this.detectives) { // mrX is captured
+
+			// mrX is captured
+			for (Player detective : this.detectives) {
 				if (detective.location() == this.mrX.location()) {
 					winner = detectivePieces;
 					break;
 				}
 			}
 
-			this.remaining = ImmutableSet.of(this.mrX.piece());
-			if (getMoves().isEmpty()) { // mrX is stuck or has no tickets
+			// mrX is stuck or has no tickets
+			this.remaining = ImmutableSet.of(this.mrX.piece());//this.remaining is updated so that getMoves only returns mrX's possible moves
+			if (getMoves().isEmpty()) {
 				winner = detectivePieces;
 			}
 			this.remaining = bufferRemaining;
 
+
 			// MrX Winning Scenarios
-			if(this.remainingRounds.isEmpty() && this.remaining.contains(mrX.piece())){ //there are no more remaining rounds
+
+			//there are no more remaining rounds
+			if(this.remainingRounds.isEmpty() && this.remaining.contains(mrX.piece())){
 				winner.add(this.mrX.piece());
 			}
+
+			//if detectives are out of tickets or stuck
 			this.remaining = ImmutableSet.copyOf(detectivePieces);
-			if(getMoves().isEmpty()){ //if detectives are out of tickets or stuck
+			if(getMoves().isEmpty()){
 				winner.add(this.mrX.piece());
 			}
 			this.remaining = bufferRemaining;
@@ -350,18 +360,18 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				detectiveLocations.add(p.location());
 			}
 
-			for(int destination : setup.graph.adjacentNodes(source)) {
+			for(int destination : setup.graph.adjacentNodes(source)) {//for adjacent node to the starting location
 
-				if (!(detectiveLocations.contains(destination))) {
+				if (!(detectiveLocations.contains(destination))) {//if there is no detective there already
 
-					for (Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {
+					for (Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {//for every transport type to said adjacent node
 
-						if (player.has(t.requiredTicket())) {
-							singleMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(), destination));
+						if (player.has(t.requiredTicket())) {//if the player has the required ticket
+							singleMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(), destination));//yhe move is added to the possible single moves list
 						}
 					}
 
-					if (player.has(Ticket.SECRET)) {
+					if (player.has(Ticket.SECRET)) {//if the player has a 'secret' ticket, than it can reach said adjacent node regardless of normal required ticket
 						singleMoves.add(new SingleMove(player.piece(), source, Ticket.SECRET, destination));
 					}
 				}
@@ -376,19 +386,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				int source) {
 
 			var doubleMoves = new ArrayList<DoubleMove>();
-			final var firstSingleMoves = getSingleMoves(setup, detectives, player, source);
+			final var firstSingleMoves = getSingleMoves(setup, detectives, player, source);//possible single moves computed by getSingleMoves method
 
-			if (player.has(Ticket.DOUBLE) && this.remainingRounds.size() > 1) {
+			if (player.has(Ticket.DOUBLE) && this.remainingRounds.size() > 1) {//if there are enough rounds left for 2 moves and player has a 'double' ticket
 
-				for (SingleMove sMove1 : firstSingleMoves) {
+				for (SingleMove sMove1 : firstSingleMoves) {//for every possible single move
 
-					var secondSingleMoves =getSingleMoves(setup, detectives, player, sMove1.destination);
+					var secondSingleMoves =getSingleMoves(setup, detectives, player, sMove1.destination);//another list if possible single moves is created
 
 
-					for (SingleMove sMove2 : secondSingleMoves) {
+					for (SingleMove sMove2 : secondSingleMoves) {//for every possible second single move
 
-						if(sMove1.ticket != sMove2.ticket || player.hasAtLeast(sMove1.ticket, 2)) {
-							DoubleMove doubleMove = new DoubleMove(
+						if(sMove1.ticket != sMove2.ticket || player.hasAtLeast(sMove1.ticket, 2)) {//if both tickets used are of the same type, then the player needs al least 2 of that ticket type
+							DoubleMove doubleMove = new DoubleMove(//the two single moves are combined into one double move
 									player.piece(),
 									sMove1.source(),
 									sMove1.ticket,
