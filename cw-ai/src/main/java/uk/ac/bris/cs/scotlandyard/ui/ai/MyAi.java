@@ -16,9 +16,6 @@ import uk.ac.bris.cs.scotlandyard.model.Piece;
 
 public class MyAi implements Ai {
 
-	//TO DO!
-	//make a global detective list
-
 	Board board;
 	Map<Integer, Integer> scoreMap = new HashMap<>();
 	ImmutableList<Piece.Detective> detectives;
@@ -44,14 +41,14 @@ public class MyAi implements Ai {
 
 	public void setAdjacentNodeScore(Integer location, Integer original) {
 		final int N = 100;
-		final double F = 0.5;
+		final double F = 2;
 
 		if (location.equals(original) || this.board.getSetup().graph.adjacentNodes(original)
 				.contains(location)) {
 			if(location.equals(original) ) {
 				scoreMap.replace(location, scoreMap.get(location) - N);
 			}
-			else scoreMap.replace(location, scoreMap.get(location) - 50);
+			else scoreMap.replace(location, scoreMap.get(location) - N/2);
 			for (Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(location)) {
 
 				setAdjacentNodeScore(adjacentNode, original);
@@ -71,7 +68,49 @@ public class MyAi implements Ai {
 		setDetectivesAdjacentNodesScore();
 	}
 
-	private void setDetectives(Board board) {
+	private Move getHighestValueMove() {
+		List<Move> highestValueMoves = new ArrayList<>();
+		int maxScore = 0;
+		for (var move : board.getAvailableMoves()){
+			if (move.commencedBy().isMrX()) {
+				Move.Visitor<Integer> destination = new Move.Visitor<Integer>() {
+					@Override
+					public Integer visit(Move.SingleMove move) {
+						return move.destination;
+					}
+
+					@Override
+					public Integer visit(Move.DoubleMove move) {
+						return move.destination2;
+					}
+				};
+				if(scoreMap.get(destination) >= maxScore) {
+					maxScore = scoreMap.get(destination);
+				}
+			}
+		}
+		for (var move : board.getAvailableMoves()){
+			if (move.commencedBy().isMrX()) {
+				Move.Visitor<Integer> destination = new Move.Visitor<Integer>() {
+					@Override
+					public Integer visit(Move.SingleMove move) {
+						return move.destination;
+					}
+
+					@Override
+					public Integer visit(Move.DoubleMove move) {
+						return move.destination2;
+					}
+				};
+				if(scoreMap.get(destination) == maxScore) {
+					highestValueMoves.add(move);
+				}
+			}
+		}
+		return highestValueMoves.get(new Random().nextInt(highestValueMoves.size()));
+	}
+
+	private void setDetectives() {
 		List<Piece> detectivePieces = new ArrayList<>();
 		List<Piece.Detective> bufferDetectives = new ArrayList<>();
 
@@ -102,8 +141,7 @@ public class MyAi implements Ai {
 
 		this.board = board;
 		initialiseScoreMap();
-		setDetectives(board);
-		var moves = board.getAvailableMoves().asList();
-		return moves.get(new Random().nextInt(moves.size()));
+		setDetectives();
+		return getHighestValueMove();
 	}
 }
