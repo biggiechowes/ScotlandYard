@@ -9,6 +9,7 @@ import javax.annotation.Nonnull;
 
 import com.google.common.collect.ImmutableList;
 import io.atlassian.fugue.Pair;
+import org.controlsfx.control.tableview2.filter.filtereditor.SouthFilter;
 import uk.ac.bris.cs.scotlandyard.model.Ai;
 import uk.ac.bris.cs.scotlandyard.model.Board;
 import uk.ac.bris.cs.scotlandyard.model.Move;
@@ -29,7 +30,6 @@ public class MyAi implements Ai {
 	private ImmutableList<Integer> getLocations() {
 		List<Integer> locations = new ArrayList<>();
 		this.detectives.forEach(x -> locations.add(this.board.getDetectiveLocation(x).get()));
-
 		return ImmutableList.copyOf(locations);
 	}
 
@@ -39,27 +39,29 @@ public class MyAi implements Ai {
 
 	}
 
-	public void setAdjacentNodeScore(Integer location, Integer original) {
-		final int N = 100;
-		final double F = 2;
+	public void setAdjacentNodeScore(Integer original) {
 
-		if (location.equals(original) || this.board.getSetup().graph.adjacentNodes(original)
-				.contains(location)) {
-			if(location.equals(original) ) {
-				scoreMap.replace(location, scoreMap.get(location) - N);
-			}
-			else scoreMap.replace(location, scoreMap.get(location) - N/2);
-			for (Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(location)) {
+		List<Integer> distanceOneLocation = new ArrayList<>();
 
-				setAdjacentNodeScore(adjacentNode, original);
+		for(Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(original)) {
+			scoreMap.replace(adjacentNode, scoreMap.get(adjacentNode) - 100);
+			distanceOneLocation.add(adjacentNode);
+		}
+
+		for(Integer node : distanceOneLocation) {
+			for(Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(node)) {
+				if (!distanceOneLocation.contains(adjacentNode) && !original.equals(adjacentNode)) {
+					scoreMap.replace(adjacentNode, scoreMap.get(adjacentNode) - 50);
+				}
 			}
 		}
+
 	}
 
 	private void setDetectivesAdjacentNodesScore() {
 		for(Integer location : getLocations()) {
 			scoreMap.replace(location, scoreMap.get(location) - 500);
-			setAdjacentNodeScore(location, location);
+			setAdjacentNodeScore(location);
 		}
 	}
 
@@ -84,8 +86,8 @@ public class MyAi implements Ai {
 						return move.destination2;
 					}
 				};
-				if(scoreMap.get(destination) >= maxScore) {
-					maxScore = scoreMap.get(destination);
+				if(scoreMap.get(move.visit(destination)) >= maxScore) {
+					maxScore = scoreMap.get(move.visit(destination));
 				}
 			}
 		}
@@ -102,19 +104,23 @@ public class MyAi implements Ai {
 						return move.destination2;
 					}
 				};
-				if(scoreMap.get(destination) == maxScore) {
+				if(scoreMap.get(move.visit(destination)) == maxScore) {
 					highestValueMoves.add(move);
 				}
 			}
 		}
-		return highestValueMoves.get(new Random().nextInt(highestValueMoves.size()));
+
+		int rand = new Random().nextInt(highestValueMoves.size());
+		if(rand < 0) rand = rand * (-1);
+		
+		return highestValueMoves.get(rand);
 	}
 
 	private void setDetectives() {
 		List<Piece> detectivePieces = new ArrayList<>();
 		List<Piece.Detective> bufferDetectives = new ArrayList<>();
 
-		this.board.getPlayers().stream().filter(Piece::isMrX).forEach(detectivePieces::add);
+		this.board.getPlayers().stream().filter(Piece::isDetective).forEach(detectivePieces::add);
 
 		for(var detective : Piece.Detective.values()){
 
@@ -125,12 +131,8 @@ public class MyAi implements Ai {
 				}
 			}
 		}
-		this.detectives = ImmutableList.copyOf(bufferDetectives);
-	}
 
-	private void setScore(){
-		setDetectivesOptimalPathScore();
-		setDetectivesAdjacentNodesScore();
+		this.detectives = ImmutableList.copyOf(bufferDetectives);
 	}
 
 	@Nonnull @Override public String name() { return "ScotFish"; }
@@ -142,6 +144,8 @@ public class MyAi implements Ai {
 		this.board = board;
 		initialiseScoreMap();
 		setDetectives();
+		setScoreMap();
+		System.out.println(scoreMap);
 		return getHighestValueMove();
 	}
 }
