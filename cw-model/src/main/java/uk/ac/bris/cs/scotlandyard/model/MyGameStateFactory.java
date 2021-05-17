@@ -8,23 +8,22 @@ import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.Move.*;
 import uk.ac.bris.cs.scotlandyard.model.Piece.*;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.*;
-import uk.ac.bris.cs.scotlandyard.model.LogEntry.*;
 
 public final class MyGameStateFactory implements Factory<GameState> {
 	@Nonnull @Override public GameState build(GameSetup setup, Player mrX, ImmutableList<Player> detectives) {
 		return new MyGameState(setup, ImmutableSet.of(MrX.MRX), ImmutableList.of(), mrX, detectives);
 	}
-	private final class MyGameState implements GameState {
+	private final static class MyGameState implements GameState {
 
 		// Attributes
-		private GameSetup setup;
+		private final GameSetup setup;
 		private ImmutableSet<Piece> remaining;
 		private ImmutableList<LogEntry> log;
 		private Player mrX;
 		private List<Player> detectives;
-		private ImmutableSet<Piece> everyone;
-		private ImmutableSet<Move> moves;
-		private ImmutableList<Boolean> remainingRounds;
+		private final ImmutableSet<Piece> everyone;
+		private final ImmutableSet<Move> moves;
+		private final ImmutableList<Boolean> remainingRounds;
 
 
 		//Constructor
@@ -35,7 +34,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (setup.rounds.isEmpty()) throw new IllegalArgumentException("Rounds is empty!");
 			if (remaining.isEmpty()) throw new IllegalArgumentException("Remaining is empty!");
 			if (mrX.isDetective()) throw new IllegalArgumentException("mrX is empty!");
-			if (mrX == null) throw new IllegalArgumentException("mrX is null");
+			if (mrX == null) throw new IllegalArgumentException("mrX is null"); //warning here is inevitable
 			if (detectives.isEmpty()) throw new IllegalArgumentException("detectives is empty!");
 			if (setup.graph.nodes().isEmpty()) throw new IllegalArgumentException("empty graph!");
 
@@ -64,7 +63,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			//remainingRounds requires a buffer variable
 			List<Boolean> bufferRemainingRounds = new ArrayList<>(this.setup.rounds);
-			for(LogEntry logEntry : log){
+			for(LogEntry ignored : log){
 				bufferRemainingRounds.remove(0);
 			}
 
@@ -140,7 +139,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private void updateLocations(@Nonnull Move move) {
 
 			//visitor pattern is used here to get the final destination of the move
-			Visitor<Integer> destination = new Visitor<Integer>() {
+			Visitor<Integer> destination = new Visitor<>() {
 				public Integer visit(SingleMove move) {
 					return move.destination;
 				}
@@ -170,7 +169,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			//visitor pattern is used to get the tickets and the destinations of the move as lists
 			//to avoid special cases for single or double moves
-			Visitor<ImmutableList<Ticket>> tickets = new Visitor<ImmutableList<Ticket>>() {
+			Visitor<ImmutableList<Ticket>> tickets = new Visitor<>() {
 				@Override
 				public ImmutableList<Ticket> visit(SingleMove move) {
 					return ImmutableList.copyOf(move.tickets());
@@ -182,7 +181,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			};
 
-			Visitor<ImmutableList<Integer>> destinations = new Visitor<ImmutableList<Integer>>() {
+			Visitor<ImmutableList<Integer>> destinations = new Visitor<>() {
 				@Override
 				public ImmutableList<Integer> visit(SingleMove move) {
 					return ImmutableList.of(move.destination);
@@ -214,7 +213,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private void updateTickets(@Nonnull Move move) {
 
 			//visitor pattern is used to get the tickets as a list
-			Visitor<List<Ticket>> tickets = new Visitor<List<Ticket>>() {
+			Visitor<List<Ticket>> tickets = new Visitor<>() {
 				@Override
 				public ImmutableList<Ticket> visit(SingleMove move) {
 					return ImmutableList.copyOf(move.tickets());
@@ -350,7 +349,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		private ImmutableSet<SingleMove> getSingleMoves(
 				GameSetup setup,
-				List<Player> detectives,
 				Player player,
 				int source){
 			var singleMoves = new ArrayList<SingleMove>();
@@ -364,7 +362,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 				if (!(detectiveLocations.contains(destination))) {//if there is no detective there already
 
-					for (Transport t : setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of())) {//for every transport type to said adjacent node
+					for (Transport t : Objects.requireNonNull(setup.graph.edgeValueOrDefault(source, destination, ImmutableSet.of()))) {//for every transport type to said adjacent node
 
 						if (player.has(t.requiredTicket())) {//if the player has the required ticket
 							singleMoves.add(new SingleMove(player.piece(), source, t.requiredTicket(), destination));//yhe move is added to the possible single moves list
@@ -381,18 +379,17 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		private ImmutableSet<DoubleMove> getDoubleMoves(
 				GameSetup setup,
-				List<Player> detectives,
 				Player player,
 				int source) {
 
 			var doubleMoves = new ArrayList<DoubleMove>();
-			final var firstSingleMoves = getSingleMoves(setup, detectives, player, source);//possible single moves computed by getSingleMoves method
+			final var firstSingleMoves = getSingleMoves(setup, player, source);//possible single moves computed by getSingleMoves method
 
 			if (player.has(Ticket.DOUBLE) && this.remainingRounds.size() > 1) {//if there are enough rounds left for 2 moves and player has a 'double' ticket
 
 				for (SingleMove sMove1 : firstSingleMoves) {//for every possible single move
 
-					var secondSingleMoves =getSingleMoves(setup, detectives, player, sMove1.destination);//another list if possible single moves is created
+					var secondSingleMoves =getSingleMoves(setup, player, sMove1.destination);//another list if possible single moves is created
 
 
 					for (SingleMove sMove2 : secondSingleMoves) {//for every possible second single move
@@ -423,13 +420,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (this.remaining.contains(this.mrX.piece())) { // get mrX moves
 				ImmutableSet<SingleMove> sMoves = getSingleMoves(
 						setup,
-						detectives,
 						mrX,
 						mrX.location()
 				);
 				List<DoubleMove> dMoves = List.copyOf(getDoubleMoves(
 						setup,
-						detectives,
 						mrX,
 						mrX.location()
 				));
@@ -440,7 +435,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 					if (this.remaining.contains(p.piece())) {
 						ImmutableSet<SingleMove> sMoves = getSingleMoves(
 								setup,
-								detectives,
 								p,
 								p.location()
 						);

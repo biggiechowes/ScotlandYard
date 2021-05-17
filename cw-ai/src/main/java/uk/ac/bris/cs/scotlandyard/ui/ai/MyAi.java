@@ -10,16 +10,14 @@ import javax.annotation.Nonnull;
 import com.google.common.collect.ImmutableList;
 import io.atlassian.fugue.Pair;
 import org.controlsfx.control.tableview2.filter.filtereditor.SouthFilter;
-import uk.ac.bris.cs.scotlandyard.model.Ai;
-import uk.ac.bris.cs.scotlandyard.model.Board;
-import uk.ac.bris.cs.scotlandyard.model.Move;
-import uk.ac.bris.cs.scotlandyard.model.Piece;
+import uk.ac.bris.cs.scotlandyard.model.*;
 
 public class MyAi implements Ai {
 
 	Board board;
 	Map<Integer, Integer> scoreMap = new HashMap<>();
 	ImmutableList<Piece.Detective> detectives;
+	Piece mrX;
 
 	private void initialiseScoreMap(){
 		for(int i = 0; i <= 199; i++) {
@@ -35,8 +33,19 @@ public class MyAi implements Ai {
 
 	private void setDetectivesOptimalPathScore() {
 
-		List<Integer> locationsInPath = new ArrayList<>();
 
+	}
+
+	private void setFerryNodeScore() {
+		List<Integer> ferryNodes = Arrays.asList(194, 157, 115, 108);
+		if(this.board.getPlayerTickets(this.mrX).get().getCount(ScotlandYard.Ticket.SECRET) > 0) {
+			for(Integer node : ferryNodes) {
+				this.scoreMap.replace(node, scoreMap.get(node) + 100);
+				if(this.board.getAvailableMoves().stream().anyMatch(x-> x.source() == node)){
+					this.scoreMap.replace(node, scoreMap.get(node) - 100);
+				}
+			}
+		}
 	}
 
 	public void setAdjacentNodeScore(Integer original) {
@@ -55,7 +64,6 @@ public class MyAi implements Ai {
 				}
 			}
 		}
-
 	}
 
 	private void setDetectivesAdjacentNodesScore() {
@@ -68,9 +76,10 @@ public class MyAi implements Ai {
 	private void setScoreMap() {
 		setDetectivesOptimalPathScore();
 		setDetectivesAdjacentNodesScore();
+		setFerryNodeScore();
 	}
 
-	private Move getHighestValueMove() {
+	private ImmutableList<Move> getHighestValueMoves() {
 		List<Move> highestValueMoves = new ArrayList<>();
 		int maxScore = 0;
 		for (var move : board.getAvailableMoves()){
@@ -110,17 +119,15 @@ public class MyAi implements Ai {
 			}
 		}
 
-		int rand = new Random().nextInt(highestValueMoves.size());
-		if(rand < 0) rand = rand * (-1);
-		
-		return highestValueMoves.get(rand);
+		return ImmutableList.copyOf(highestValueMoves);
 	}
 
-	private void setDetectives() {
+	private void setPlayers() {
 		List<Piece> detectivePieces = new ArrayList<>();
 		List<Piece.Detective> bufferDetectives = new ArrayList<>();
 
 		this.board.getPlayers().stream().filter(Piece::isDetective).forEach(detectivePieces::add);
+		this.board.getPlayers().stream().filter(Piece::isMrX).forEach(x -> this.mrX = x);
 
 		for(var detective : Piece.Detective.values()){
 
@@ -135,6 +142,65 @@ public class MyAi implements Ai {
 		this.detectives = ImmutableList.copyOf(bufferDetectives);
 	}
 
+	private Move getSelectedMove() {
+
+		ImmutableList<Move> highestValueMoves = getHighestValueMoves();
+		ImmutableList<Move> moves = board.getAvailableMoves().asList();
+
+		if(highestValueMoves.isEmpty()) {
+			return moves.get(new Random().nextInt(moves.size()));
+		}
+
+		List<Move> normalMoves = new ArrayList<>();
+		List<Move> doubleMoves = new ArrayList<>();
+		List<Move> secretMoves = new ArrayList<>();
+
+		for(var move : moves){
+			Move.Visitor<ArrayList<ScotlandYard.Ticket>> tickets = new Move.Visitor<ArrayList<ScotlandYard.Ticket>>() {
+				@Override
+				public ArrayList<ScotlandYard.Ticket> visit(Move.SingleMove move) {
+					ArrayList<ScotlandYard.Ticket> tickets = new ArrayList<>();
+					tickets.add(move.ticket);
+					return tickets;
+				}
+
+				@Override
+				public ArrayList<ScotlandYard.Ticket> visit(Move.DoubleMove move) {
+					ArrayList<ScotlandYard.Ticket> tickets = new ArrayList<>();
+					tickets.add(move.ticket1);
+					tickets.add(move.ticket2);
+					return tickets;
+				}
+			};
+			if(move.visit(tickets).size() > 1) {
+				doubleMoves.add(move);
+			}
+			if(move.visit(tickets).contains(ScotlandYard.Ticket.SECRET)) {
+				secretMoves.add(move);
+			}
+			if(!(doubleMoves.contains(move) || secretMoves.contains(move))) {
+				normalMoves.add(move);
+			}
+		}
+		var rand = Math.random();
+		if (rand < 0.8) {
+			if (normalMoves.isEmpty()) return secretMoves.get(new Random().nextInt(secretMoves.size()));
+			return normalMoves.get(new Random().nextInt(normalMoves.size()));
+		}
+		else if(rand < 0.9) {
+			if (doubleMoves.isEmpty()) {
+				if(normalMoves.isEmpty()) return secretMoves.get(new Random().nextInt(secretMoves.size()));
+				return normalMoves.get(new Random().nextInt(normalMoves.size()));
+			}
+			return doubleMoves.get(new Random().nextInt(doubleMoves.size()));
+		}
+		else {
+			if (secretMoves.isEmpty()) return normalMoves.get(new Random().nextInt(normalMoves.size()));
+			return secretMoves.get(new Random().nextInt(secretMoves.size()));
+		}
+
+	}
+
 	@Nonnull @Override public String name() { return "ScotFish"; }
 
 	@Nonnull @Override public Move pickMove(
@@ -143,9 +209,9 @@ public class MyAi implements Ai {
 
 		this.board = board;
 		initialiseScoreMap();
-		setDetectives();
+		setPlayers();
 		setScoreMap();
 		System.out.println(scoreMap);
-		return getHighestValueMove();
+		return getSelectedMove();
 	}
 }
