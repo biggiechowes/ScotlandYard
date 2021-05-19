@@ -13,44 +13,14 @@ import uk.ac.bris.cs.scotlandyard.model.*;
 public class MyAi implements Ai {
 
 	//Attributes
+
 	Board board;
 	Map<Integer, Integer> scoreMap = new HashMap<>();
 	ImmutableList<Piece.Detective> detectives;
 	Piece mrX;
 
-	//Initialise all map nodes with the initial score of 0
-	private void initialiseScoreMap(){
-		for(int i = 1; i <= 199; i++) {
-			scoreMap.put(i, 0);
-		}
-	}
 
-	//Return the locations of detectives as a immutable list
-	private ImmutableList<Integer> getDetectiveLocations() {
-		List<Integer> locations = new ArrayList<>();
-		this.detectives.forEach(x -> locations.add(this.board.getDetectiveLocation(x).get()));
-		return ImmutableList.copyOf(locations);
-	}
-
-	//Set the score for the ferry nodes
-	private void setFerryNodeScore() {
-		final int N = 125;//score modifier for this method
-
-		List<Integer> ferryNodes = Arrays.asList(194, 157, 115, 108);
-
-
-		if(this.board.getPlayerTickets(this.mrX).get().getCount(ScotlandYard.Ticket.SECRET) > 0) {//if mrX has at least one secret ticket
-			for(Integer node : ferryNodes) {//for every ferry node
-				this.scoreMap.replace(node, scoreMap.get(node) + N);//the score is increased by N
-
-				//If mrX is on a ferry node, then that node's score is reduced by N, resulting in a net score increase
-				//of 0. This avoids the case of mrX taking a double move to the same spot.
-				if(this.board.getAvailableMoves().stream().anyMatch(x-> x.source() == node)){
-					this.scoreMap.replace(node, scoreMap.get(node) - N);
-				}
-			}
-		}
-	}
+	//Setters
 
 	//Setting the score for nodes adjacent to origin to a distance of two
 	public void setAdjacentNodeScore(Integer origin) {
@@ -85,6 +55,26 @@ public class MyAi implements Ai {
 		}
 	}
 
+	//Set the score for the ferry nodes
+	private void setFerryNodeScore() {
+		final int N = 125;//score modifier for this method
+
+		List<Integer> ferryNodes = Arrays.asList(194, 157, 115, 108);
+
+
+		if(this.board.getPlayerTickets(this.mrX).get().getCount(ScotlandYard.Ticket.SECRET) > 0) {//if mrX has at least one secret ticket
+			for(Integer node : ferryNodes) {//for every ferry node
+				this.scoreMap.replace(node, scoreMap.get(node) + N);//the score is increased by N
+
+				//If mrX is on a ferry node, then that node's score is reduced by N, resulting in a net score increase
+				//of 0. This avoids the case of mrX taking a double move to the same spot.
+				if(this.board.getAvailableMoves().stream().anyMatch(x-> x.source() == node)){
+					this.scoreMap.replace(node, scoreMap.get(node) - N);
+				}
+			}
+		}
+	}
+
 	//Setting the score for all nodes
 	private void setScoreMap() {
 		setDetectivesAdjacentNodesScore();
@@ -98,7 +88,7 @@ public class MyAi implements Ai {
 		List<Piece.Detective> bufferDetectives = new ArrayList<>();
 
 		this.board.getPlayers().stream().filter(Piece::isDetective).forEach(detectivePieces::add);//detective pieces are added to the detectivePieces list
-		this.board.getPlayers().stream().filter(Piece::isMrX).forEach(x -> this.mrX = x);//this.mrX is set as mrX' piece
+		this.board.getPlayers().stream().filter(Piece::isMrX).forEach(x -> this.mrX = x);//this.mrX is set as mrX's piece
 
 		for(var detective : Piece.Detective.values()){//for each detective in Piece.Detective enum
 			for (Piece piece : detectivePieces) {//for each piece in detectivePieces
@@ -110,6 +100,9 @@ public class MyAi implements Ai {
 
 		this.detectives = ImmutableList.copyOf(bufferDetectives);//this.detectives is updated
 	}
+
+
+	//Getters
 
 	//The moves that have the highest value are returned as a immutable list
 	private ImmutableList<Move> getHighestValueMoves() {
@@ -163,7 +156,7 @@ public class MyAi implements Ai {
 		return ImmutableList.copyOf(highestValueMoves);
 	}
 
-	//
+	//Returns the move that is considered the best based on the destination node's score
 	private Move getBestMove() {
 
 		ImmutableList<Move> highestValueMoves = getHighestValueMoves();
@@ -226,12 +219,34 @@ public class MyAi implements Ai {
 			return doubleMoves.get(new Random().nextInt(doubleMoves.size()));
 		}
 		else {//if the value is greater than 0.9 (10% chance)
-			//if there are no secret moves available, there must be at least one normal move available
-			if (secretMoves.isEmpty()) return normalMoves.get(new Random().nextInt(normalMoves.size()));
+			//if there are no secret moves available, there must be at least one normal or double move available
+			if (secretMoves.isEmpty()) {
+				//if there are no normal moves available, there must be at least one double move available
+				if(normalMoves.isEmpty()) return  doubleMoves.get(new Random().nextInt(doubleMoves.size()));
+
+				return normalMoves.get(new Random().nextInt(normalMoves.size()));
+			}
 
 			return secretMoves.get(new Random().nextInt(secretMoves.size()));//return a secret move
 		}
 
+	}
+
+	//Return the locations of detectives as a immutable list
+	private ImmutableList<Integer> getDetectiveLocations() {
+		List<Integer> locations = new ArrayList<>();
+		this.detectives.forEach(x -> locations.add(this.board.getDetectiveLocation(x).get()));
+		return ImmutableList.copyOf(locations);
+	}
+
+
+	//Methods
+
+	//Initialise all map nodes with the initial score of 0
+	private void initialiseScoreMap(){
+		for(int i = 1; i <= 199; i++) {
+			scoreMap.put(i, 0);
+		}
 	}
 
 	@Nonnull @Override public String name() { return "ScotFish"; }//ScotFish is a pun on the popular chess engine Stockfish

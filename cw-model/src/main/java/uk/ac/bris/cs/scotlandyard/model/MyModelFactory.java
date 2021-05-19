@@ -11,7 +11,7 @@ public final class MyModelFactory implements Factory<Model> {
 	private ImmutableSet<Model.Observer> observers;
 	private Board.GameState state;
 
-	//subclass visitor pattern that implements Model
+	//subclass pattern that implements Model
 	public Model myModel = new Model() {
 
 		@Nonnull
