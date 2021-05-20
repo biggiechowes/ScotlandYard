@@ -23,21 +23,22 @@ public class MyAi implements Ai {
 	//Setters
 
 	//Setting the score for nodes adjacent to origin to a distance of two
-	public void setAdjacentNodeScore(Integer origin) {
+	public void setAdjacentNodeScore(Integer origin,
+									 final int N, //score modifier for this method
+									 final int F //modifying factor
+									) {
 
-		final int N = 100;//score modifier for this method
-		final int F = 2;//scaling factor for score modifier
 
-		List<Integer> distanceOneLocation = new ArrayList<>();//nodes with distance one to detective locations as a list
+		List<Integer> distanceOneLocations = new ArrayList<>();//nodes with distance one to detective locations as a list
 
 		for(Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(origin)) {//for every node adjacent to origin
 			scoreMap.replace(adjacentNode, scoreMap.get(adjacentNode) - N);//score is decreased br N points
-			distanceOneLocation.add(adjacentNode);//the node is added to the distanceOneLocation list
+			distanceOneLocations.add(adjacentNode);//the node is added to the distanceOneLocation list
 		}
 
-		for(Integer node : distanceOneLocation) {//for every node in distanceOneLocation
+		for(Integer node : distanceOneLocations) {//for every node in distanceOneLocation
 			for(Integer adjacentNode : this.board.getSetup().graph.adjacentNodes(node)) {//for every node adjacent to it
-				if ( !(distanceOneLocation.contains(adjacentNode) || origin.equals(adjacentNode)) ) {//if the adjacent node is not the origin or in the distanceOneLocation list
+				if ( !(distanceOneLocations.contains(adjacentNode) || origin.equals(adjacentNode)) ) {//if the adjacent node is not the origin or in the distanceOneLocation list
 					scoreMap.replace(adjacentNode, scoreMap.get(adjacentNode) - (N / F) );//score is decreased by N/F points
 				}
 			}
@@ -45,22 +46,18 @@ public class MyAi implements Ai {
 	}
 
 	//Setting the score for the detective location nodes and for those that are adjacent to them
-	private void setDetectivesAdjacentNodesScore() {
-
-		final int N = 500;//score modifier for this method
+	private void setDetectivesAdjacentNodesScore(int N, int F) {
 
 		for(Integer location : getDetectiveLocations()) {//for every detective location
-			scoreMap.replace(location, scoreMap.get(location) - N);//the score is decreased by N points
-			setAdjacentNodeScore(location);//setAdjacentNodeScore helper function to set the score of adjacent nodes
+			scoreMap.replace(location, scoreMap.get(location) - (N * 5) );//the score is decreased by N * 5 points
+			setAdjacentNodeScore(location, N, F);//setAdjacentNodeScore helper function to set the score of adjacent nodes
 		}
 	}
 
 	//Set the score for the ferry nodes
-	private void setFerryNodeScore() {
-		final int N = 125;//score modifier for this method
+	private void setFerryNodeScore(final int N /*score modifier for this method*/) {
 
 		List<Integer> ferryNodes = Arrays.asList(194, 157, 115, 108);
-
 
 		if(this.board.getPlayerTickets(this.mrX).get().getCount(ScotlandYard.Ticket.SECRET) > 0) {//if mrX has at least one secret ticket
 			for(Integer node : ferryNodes) {//for every ferry node
@@ -77,8 +74,8 @@ public class MyAi implements Ai {
 
 	//Setting the score for all nodes
 	private void setScoreMap() {
-		setDetectivesAdjacentNodesScore();
-		setFerryNodeScore();
+		setDetectivesAdjacentNodesScore(100, 2);
+		setFerryNodeScore(125);
 	}
 
 	//Setting thr players
