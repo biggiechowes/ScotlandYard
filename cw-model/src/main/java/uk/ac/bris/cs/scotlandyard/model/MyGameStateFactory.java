@@ -27,8 +27,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 
 		//Constructor
-		private MyGameState(final GameSetup setup, final ImmutableSet<Piece> remaining, final ImmutableList<
-				LogEntry> log, final Player mrX, final List<Player> detectives) {
+		private MyGameState(final GameSetup setup, final ImmutableSet<Piece> remaining,
+							final ImmutableList<LogEntry> log, final Player mrX, final List<Player> detectives) {
 
 			// Tests to ensure parameters are not null
 			if (setup.rounds.isEmpty()) throw new IllegalArgumentException("Rounds is empty!");
@@ -83,7 +83,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.moves = this.getMoves();
 
 		}
+
+
 		// Methods
+
 		@Nonnull @Override
 		public GameState advance(Move move) {
 
@@ -93,9 +96,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			//advance calls helper methods to update required attributes and then returns
 			//a new MyGameState object
-			updateLog(move);
 			updateRemaining(move);
 			updateLocations(move);
+			updateLog(move);
 			updateTickets(move);
 
 
@@ -110,7 +113,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			List<Piece> bufferRemaining = new ArrayList<>();
 
 			//this.remaining alternates between the remaining detectives and mrX
-
 
 			//if mrX is the one who moved, the remaining players in the round are all the detectives
 			if (move.commencedBy().isMrX()) {
@@ -140,6 +142,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			//visitor pattern is used here to get the final destination of the move
 			Visitor<Integer> destination = new Visitor<>() {
+				@Override
 				public Integer visit(SingleMove move) {
 					return move.destination;
 				}
@@ -150,14 +153,14 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			};
 
-			if (move.commencedBy().isMrX()){
-				mrX = mrX.at(move.visit(destination));
+			if (move.commencedBy().isMrX()){ //if the move was commenced by mrX
+				mrX = mrX.at(move.visit(destination)); //his location is updated to the destination
 			}
-			else {
-				for (int i = 0; i <= this.detectives.size() - 1; i++) {
-					if(this.detectives.get(i).piece() == move.commencedBy()) {
+			else { //otherwise
+				for (int i = 0; i <= this.detectives.size() - 1; i++) { //for each detective
+					if(this.detectives.get(i).piece() == move.commencedBy()) { //if this detective is the one who commenced the move
 						List<Player> bufferDetectives = new ArrayList<>(this.detectives);
-						bufferDetectives.set(i, this.detectives.get(i).at(move.visit(destination)));
+						bufferDetectives.set(i, this.detectives.get(i).at(move.visit(destination))); //the detective's location is updated to the destination
 						this.detectives = bufferDetectives;
 					}
 				}
@@ -198,7 +201,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if(move.commencedBy().isMrX()) {
 				List<LogEntry> bufferLog = new ArrayList<>(this.log);
 
-				for (int i = 0; i <= move.visit(destinations).size() - 1; i++) {
+				for (int i = 0; i <= move.visit(destinations).size() - 1; i++) { //for each destination of the move
 					if (this.remainingRounds.get(i)) { // if current round is reveal the log entry is added accordingly
 						bufferLog.add(LogEntry.reveal(move.visit(tickets).get(i),
 								move.visit(destinations).get(i)));
@@ -225,34 +228,22 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				}
 			};
 
-			if (move.commencedBy().isMrX()) {
-				for (Ticket ticket : move.visit(tickets)) {
-					mrX = mrX.use(ticket);
+			if (move.commencedBy().isMrX()) { //if the move was commenced by mrX
+				for (Ticket ticket : move.visit(tickets)) { //for each ticket of the move
+					mrX = mrX.use(ticket); //the ticket is used
 				}
 			}
-			else {
-				for (Ticket ticket : move.visit(tickets)) {
-					for (int i = 0; i <= this.detectives.size() - 1; i++) {
-						if (this.detectives.get(i).piece() == move.commencedBy()) {
-							//tickets used by detectives are given to mrX
-							this.detectives.set(i, this.detectives.get(i).use(ticket));
-							mrX = mrX.give(ticket);
+			else { //otherwise
+				for (Ticket ticket : move.visit(tickets)) { //for each ticket of the move
+					for (int i = 0; i <= this.detectives.size() - 1; i++) { //for each detective
+						if (this.detectives.get(i).piece() == move.commencedBy()) { //if the detective is the one who commenced the move
+							this.detectives.set(i, this.detectives.get(i).use(ticket)); //the ticket is used
+							mrX = mrX.give(ticket); //tickets used by detectives are given to mrX
 						}
 					}
 				}
 			}
 
-		}
-
-		// Getters
-		@Nonnull @Override
-		public GameSetup getSetup() {
-			return setup;
-		}
-
-		@Nonnull @Override
-		public ImmutableSet<Piece> getPlayers() {
-			return this.everyone;
 		}
 
 		@Nonnull @Override
@@ -286,19 +277,13 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			if (piece == this.mrX.piece()) {
 				return Optional.of(new MyTicketBoard(this.mrX));
 			}
-			for (Player p : this.detectives) {
-				if (p.piece() == piece) {
-					return Optional.of(new MyTicketBoard(p));
+			for (Player p : this.detectives) { //for each player in this.detectives
+				if (p.piece() == piece) { //if the detective's piece is the same as the passed piece
+					return Optional.of(new MyTicketBoard(p)); //an Optional of MyTicketBoard is returned
 				}
 			}
 
 			return Optional.empty();
-		}
-
-
-		@Nonnull @Override
-		public ImmutableList<LogEntry> getMrXTravelLog() {
-			return log;
 		}
 
 		@Nonnull @Override
@@ -351,6 +336,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				GameSetup setup,
 				Player player,
 				int source){
+			
 			var singleMoves = new ArrayList<SingleMove>();
 			ArrayList<Integer> detectiveLocations = new ArrayList<>();
 
@@ -453,6 +439,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			//getMoves is a helper method that return all available moves
 			return getMoves();
 		}
+
+		// Getters
+
+		@Nonnull @Override
+		public GameSetup getSetup() {
+			return this.setup;
+		}
+
+		@Nonnull @Override
+		public ImmutableSet<Piece> getPlayers() {
+			return this.everyone;
+		}
+
+		@Nonnull @Override
+		public ImmutableList<LogEntry> getMrXTravelLog() {
+			return log;
+		}
+
+
 
 	}
 }
